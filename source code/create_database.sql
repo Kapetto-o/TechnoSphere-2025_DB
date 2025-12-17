@@ -1,7 +1,7 @@
 use master
 go
 
-create database TechnoSphere_2025
+create database TechnoSphere_2025_DB
 on primary (
     name = 'TechnoSphere-2025_DB',
     filename = 'D:\Programs\SQL Server 2025\MSSQL17.SQLEXPRESS\MSSQL\DATA\TechnoSphere-2025_DB.mdf',

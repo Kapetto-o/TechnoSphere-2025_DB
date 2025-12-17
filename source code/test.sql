@@ -1,10 +1,13 @@
 use TechnoSphere_2025_DB
 go
 
+set statistics io on;
+set statistics time on;
+
 -- фильтраци€ по категории + цена
 select *
 from dbo.products
-where category_id = 1
+where category_id = 2
   and price between 10000 and 50000;
 
 -- сортировка по попул€рности
@@ -21,10 +24,6 @@ where name like '%galaxy%'
 -- выборка всех товаров дл€ экспорта
 select *
 from dbo.products;
-set statistics io on;
-set statistics time on;
 
-create nonclustered index ix_products_category_price_popularity
-on dbo.products (category_id, price, popularity);
-create nonclustered index ix_products_popularity_desc
-on dbo.products(popularity desc);
+create nonclustered index ix_products_category_price_popularity on dbo.products (category_id, price, popularity);
+create nonclustered index ix_products_popularity_desc on dbo.products(popularity desc);
