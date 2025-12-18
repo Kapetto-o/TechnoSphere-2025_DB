@@ -279,7 +279,7 @@ begin
     declare @cmd_varchar varchar(8000);
 
     -- путь к файлу
-    set @file_path = 'c:\technosphere_json\' + @table_name + '.json';
+    set @file_path = 'C:\DataBase\TechnoSphere_2025_DB\' + @table_name + '.json';
 
     -- формируем команду bcp
     -- !!! замени -S и -d при необходимости !!!
