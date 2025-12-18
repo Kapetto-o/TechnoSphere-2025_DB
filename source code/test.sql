@@ -1,29 +1,180 @@
-use TechnoSphere_2025_DB
+use TechnoSphere_2025_DB;
 go
 
-set statistics io on;
-set statistics time on;
+set nocount on;
 
--- фильтраци€ по категории + цена
-select *
-from dbo.products
-where category_id = 2
-  and price between 10000 and 50000;
+begin try
+    select
+        u.user_id,
+        u.login,
+        r.role_name
+    from dbo.users u
+    join dbo.roles r
+        on r.role_id = u.role_id;
+end try
+begin catch
+    print 'ошибка при выводе ролей: ' + error_message();
+end catch
+go
 
--- сортировка по попул€рности
-select *
-from dbo.products
-order by popularity desc;
+begin try
+    -- добавление
+    declare @category_id int = 1;
+    exec dbo.proc_add_product
+        @category_id = @category_id,
+        @name = 'машина',
+        @brand = 'testbrand',
+        @price = 9999.99,
+        @description = 'добавлен дл€ демонстрации',
+        @is_available = 1;
 
--- поиск по бренду и названию
-select *
-from dbo.products
-where name like '%galaxy%'
-   or brand = 'samsung';
+    -- получаем id добавленного товара
+    declare @test_product_id bigint;
+    set @test_product_id = (select top 1 product_id
+                            from dbo.products
+                            where name = 'тестовый товар'
+                            order by product_id desc);
 
--- выборка всех товаров дл€ экспорта
-select *
-from dbo.products;
+    -- обновление
+    exec dbo.proc_update_product
+        @product_id = @test_product_id,
+        @category_id = @category_id,
+        @name = 'тестовый товар (обновлЄн)',
+        @brand = 'testbrand',
+        @price = 10999.99,
+        @description = 'обновлЄнное описание',
+        @is_available = 1;
 
-create nonclustered index ix_products_category_price_popularity on dbo.products (category_id, price, popularity);
-create nonclustered index ix_products_popularity_desc on dbo.products(popularity desc);
+    -- удаление
+    exec dbo.proc_delete_product
+        @product_id = @test_product_id;
+end try
+begin catch
+    print 'ошибка управлени€ товарами: ' + error_message();
+end catch
+go
+
+-- избранное
+declare @user_id int;
+declare @product_id bigint;
+
+begin try
+    set @user_id = (select top 1 user_id from dbo.users);
+    set @product_id = (select top 1 product_id from dbo.products);
+
+    -- добавление
+    exec dbo.proc_add_to_favorites
+        @user_id = @user_id,
+        @product_id = @product_id;
+
+    select *
+    from dbo.favorites
+    where user_id = @user_id;
+
+    -- удаление
+    exec dbo.proc_remove_from_favorites
+        @user_id = @user_id,
+        @product_id = @product_id;
+end try
+begin catch
+    print 'ошибка работы с избранным: ' + error_message();
+end catch
+go
+
+-- корзина
+begin try
+    -- добавление в корзину
+    declare @product_id int = 120001;
+    declare @user_id int = 1;
+    exec dbo.proc_add_to_basket
+        @user_id = @user_id,
+        @product_id = @product_id,
+        @quantity = 2;
+
+    -- просмотр корзины
+    exec dbo.proc_get_basket
+        @user_id = @user_id;
+
+    -- удаление из корзины
+    exec dbo.proc_remove_from_basket
+        @user_id = @user_id,
+        @product_id = @product_id;
+end try
+begin catch
+    print 'ошибка работы с корзиной: ' + error_message();
+end catch
+go
+
+-------------------------------------------------
+-- 5. заказы
+-------------------------------------------------
+print '5. заказы';
+
+declare @order_id bigint;
+
+begin try
+    -- снова добавл€ем товар в корзину дл€ создани€ заказа
+    exec dbo.proc_add_to_basket @user_id, @product_id, 1;
+
+    -- создание заказа
+    exec dbo.proc_create_order
+        @user_id = @user_id,
+        @shipping_address = 'г. тестовый, ул. демонстрационна€, д. 1';
+
+    -- получаем id последнего заказа
+    set @order_id = (select top 1 order_id
+                     from dbo.orders
+                     where user_id = @user_id
+                     order by created_at desc);
+
+    -- просмотр заказов пользовател€
+    exec dbo.proc_get_user_orders
+        @user_id = @user_id;
+
+    -- изменение статуса заказа
+    exec dbo.proc_update_order_status
+        @order_id = @order_id,
+        @status_id = 2; -- paid
+end try
+begin catch
+    print 'ошибка работы с заказами: ' + error_message();
+end catch
+go
+
+-- фильтраци€ товаров
+begin try
+    exec dbo.proc_get_products
+        @category_id = @category_id;
+
+    exec dbo.proc_get_products
+        @min_price = 45000,
+        @max_price = 50000;
+
+    exec dbo.proc_get_products
+        @brand = 'samsung';
+end try
+begin catch
+    print 'ошибка фильтрации товаров: ' + error_message();
+end catch
+go
+
+-- сортировка товаров
+begin try
+    exec dbo.proc_get_products @sort_mode = 'price';
+    exec dbo.proc_get_products @sort_mode = 'popularity';
+    exec dbo.proc_get_products @sort_mode = 'new';
+end try
+begin catch
+    print 'ошибка сортировки товаров: ' + error_message();
+end catch
+go
+
+-- поиск товаров
+begin try
+    exec dbo.proc_search_products
+        @search_text = 'машина';
+end try
+begin catch
+    print 'ошибка поиска товаров: ' + error_message();
+end catch
+go
