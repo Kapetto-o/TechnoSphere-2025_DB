@@ -128,26 +128,32 @@ as
 begin
     set nocount on;
 
-    select
-        p.product_id,
-        p.name,
-        p.brand,
-        p.price,
-        p.is_available,
-        p.created_at,
-        p.popularity,
-        c.category_name
-    from products p
-    join categories c on c.category_id = p.category_id
-    where
-        (@category_id is null or p.category_id = @category_id)
-        and (@brand is null or p.brand = @brand)
-        and (@min_price is null or p.price >= @min_price)
-        and (@max_price is null or p.price <= @max_price)
-    order by
-        case when @sort_mode = 'price' then p.price end,
-        case when @sort_mode = 'popularity' then p.popularity end desc,
-        case when @sort_mode = 'new' then p.created_at end desc;
+    begin try
+        select
+            p.product_id,
+            p.name,
+            p.brand,
+            p.price,
+            p.is_available,
+            p.created_at,
+            p.popularity,
+            c.category_name
+        from products p
+        join categories c on c.category_id = p.category_id
+        where
+            (@category_id is null or p.category_id = @category_id)
+            and (@brand is null or p.brand = @brand)
+            and (@min_price is null or p.price >= @min_price)
+            and (@max_price is null or p.price <= @max_price)
+        order by
+            case when @sort_mode = 'price' then p.price end,
+            case when @sort_mode = 'popularity' then p.popularity end desc,
+            case when @sort_mode = 'new' then p.created_at end desc;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -158,17 +164,23 @@ as
 begin
     set nocount on;
 
-    select
-        p.product_id,
-        p.name,
-        p.brand,
-        p.price,
-        c.category_name
-    from products p
-    join categories c on c.category_id = p.category_id
-    where
-        p.name like '%' + @search_text + '%'
-        or p.brand like '%' + @search_text + '%';
+    begin try
+        select
+            p.product_id,
+            p.name,
+            p.brand,
+            p.price,
+            c.category_name
+        from products p
+        join categories c on c.category_id = p.category_id
+        where
+            p.name like '%' + @search_text + '%'
+            or p.brand like '%' + @search_text + '%';
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -180,26 +192,33 @@ as
 begin
     set nocount on;
 
-    if not exists (select 1 from users where user_id = @user_id)
-    begin
-        raiserror ('пользователь не найден', 16, 1);
-        return;
-    end;
+    begin try
+        if not exists (select 1 from users where user_id = @user_id)
+        begin
+            raiserror ('пользователь не найден', 16, 1);
+            return;
+        end;
 
-    if not exists (select 1 from products where product_id = @product_id)
-    begin
-        raiserror ('товар не найден', 16, 1);
-        return;
-    end;
+        if not exists (select 1 from products where product_id = @product_id)
+        begin
+            raiserror ('товар не найден', 16, 1);
+            return;
+        end;
 
-    if not exists (
-        select 1 from favorites
-        where user_id = @user_id and product_id = @product_id
-    )
-    begin
-        insert into favorites (user_id, product_id)
-        values (@user_id, @product_id);
-    end;
+        if not exists (
+            select 1
+            from favorites
+            where user_id = @user_id and product_id = @product_id
+        )
+        begin
+            insert into favorites (user_id, product_id)
+            values (@user_id, @product_id);
+        end;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -208,9 +227,15 @@ create or alter procedure proc_remove_from_favorites
     @product_id bigint
 as
 begin
-    delete from favorites
-    where user_id = @user_id
-      and product_id = @product_id;
+    begin try
+        delete from favorites
+        where user_id = @user_id
+          and product_id = @product_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -310,21 +335,27 @@ create or alter procedure proc_remove_from_basket
     @product_id bigint
 as
 begin
-    if exists (
-        select 1
-        from users u
-        join roles r on r.role_id = u.role_id
-        where u.user_id = @user_id
-          and r.role_name = 'blocked'
-    )
-    begin
-        raiserror (N'пользователь заблокирован', 16, 1);
-        return;
-    end;
+    begin try
+        if exists (
+            select 1
+            from users u
+            join roles r on r.role_id = u.role_id
+            where u.user_id = @user_id
+              and r.role_name = 'blocked'
+        )
+        begin
+            raiserror (N'пользователь заблокирован', 16, 1);
+            return;
+        end;
 
-    delete from basket_items
-    where user_id = @user_id
-      and product_id = @product_id;
+        delete from basket_items
+        where user_id = @user_id
+          and product_id = @product_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -332,21 +363,27 @@ create or alter procedure proc_get_basket
     @user_id int
 as
 begin
-    if exists (
-        select 1
-        from users u
-        join roles r on r.role_id = u.role_id
-        where u.user_id = @user_id
-          and r.role_name = 'blocked'
-    )
-    begin
-        raiserror (N'пользователь заблокирован', 16, 1);
-        return;
-    end;
+    begin try
+        if exists (
+            select 1
+            from users u
+            join roles r on r.role_id = u.role_id
+            where u.user_id = @user_id
+              and r.role_name = 'blocked'
+        )
+        begin
+            raiserror (N'пользователь заблокирован', 16, 1);
+            return;
+        end;
 
-    select *
-    from vw_basket_items
-    where user_id = @user_id;
+        select *
+        from vw_basket_items
+        where user_id = @user_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -407,9 +444,15 @@ create or alter procedure proc_update_order_status
     @status_id tinyint
 as
 begin
-    update orders
-    set status_id = @status_id
-    where order_id = @order_id;
+    begin try
+        update orders
+        set status_id = @status_id
+        where order_id = @order_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -417,9 +460,49 @@ create or alter procedure proc_get_user_orders
     @user_id int
 as
 begin
-    select *
-    from vw_orders
-    where user_id = @user_id;
+    begin try
+        select *
+        from vw_orders
+        where user_id = @user_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
+end;
+go
+
+create or alter procedure proc_get_order_items
+    @order_id bigint,
+    @user_id int
+as
+begin
+    set nocount on;
+
+    -- проверка, что заказ принадлежит пользователю
+    if not exists (
+        select 1
+        from orders
+        where order_id = @order_id
+          and user_id = @user_id
+    )
+    begin
+        raiserror (N'заказ не найден или доступ запрещён', 16, 1);
+        return;
+    end;
+
+    select
+        oi.order_item_id,
+        oi.product_id,
+        p.name,
+        p.brand,
+        oi.quantity,
+        oi.unit_price,
+        (oi.quantity * oi.unit_price) as total_price
+    from order_items oi
+    join products p
+        on p.product_id = oi.product_id
+    where oi.order_id = @order_id;
 end;
 go
 
@@ -458,7 +541,7 @@ begin
         N' for json path, root(''products''), include_null_values' +
         N') as JsonData" ' +
         N'queryout "' + @file_path + N'" ' +
-        N'-S Kapetto\SQLEXPRESS -d TechnoSphere_2025_DB -T -w -Yo -u';
+        N'-S Kapetto-2\SQLEXPRESS -d TechnoSphere_2025_DB -T -w';
 
     set @cmd_varchar = cast(@cmd_nvarchar as varchar(8000));
 
@@ -659,9 +742,15 @@ create or alter procedure proc_block_user
     @user_id int
 as
 begin
-    update users
-    set role_id = (select role_id from roles where role_name = 'blocked')
-    where user_id = @user_id;
+    begin try
+        update users
+        set role_id = (select role_id from roles where role_name = 'blocked')
+        where user_id = @user_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -670,24 +759,37 @@ create or alter procedure proc_unblock_user
     @user_id int
 as
 begin
-    update users
-    set role_id = (select role_id from roles where role_name = 'user')
-    where user_id = @user_id;
+    begin try
+        update users
+        set role_id = (select role_id from roles where role_name = 'user')
+        where user_id = @user_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
+
 
 -- Удаление пользователя
 create or alter procedure proc_delete_user
     @user_id int
 as
 begin
-    delete from favorites where user_id = @user_id;
+    begin try
+        delete from favorites where user_id = @user_id;
 
-    delete from basket_items where user_id = @user_id;
+        delete from basket_items where user_id = @user_id;
 
-    delete from orders where user_id = @user_id;
+        delete from orders where user_id = @user_id;
 
-    delete from users where user_id = @user_id;
+        delete from users where user_id = @user_id;
+    end try
+    begin catch
+        declare @err nvarchar(4000) = error_message();
+        raiserror (@err, 16, 1);
+    end catch;
 end;
 go
 
@@ -874,4 +976,13 @@ begin
         on r.role_id = u.role_id
     order by u.user_id;
 end;
+go
+
+-- НАСТРОЙКА
+exec sp_configure 'show advanced options', 1;
+reconfigure;
+go
+
+exec sp_configure 'xp_cmdshell', 1;
+reconfigure;
 go

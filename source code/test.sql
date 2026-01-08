@@ -30,11 +30,6 @@ go
 use master;
 go
 
-alter database TechnoSphere_2025_DB
-set single_user
-with rollback immediate;
-go
-
 restore database TechnoSphere_2025_DB
 from disk = 'C:\DataBase\TechnoSphere_2025_DB\technosphere_full.bak'
 with
@@ -102,7 +97,7 @@ exec dbo.proc_get_categories;
 
 -- Фильтрация
 exec dbo.proc_get_products
-    @category_id = 1;
+    @category_id = 4;
 go
 
 exec dbo.proc_get_products
@@ -129,18 +124,18 @@ go
 
 -- Поиск товаров
 exec dbo.proc_search_products
-    @search_text = 'смартфон samsung galaxy s22 108040';
+    @search_text = 'смартфон samsung galaxy s22 116800';
 go
 
 -- Выбор определённого товара
 exec dbo.proc_get_product_by_id
-    @product_id = 1680096;
+    @product_id = 144260;
 go
 
 -- Добавить \ Удалить товар в избранное
 exec dbo.proc_add_to_favorites
     @user_id = 3,
-    @product_id = 1745499;
+    @product_id = 65778;
 go
 
 exec dbo.proc_get_favorites
@@ -149,14 +144,14 @@ go
 
 exec dbo.proc_remove_from_favorites
     @user_id = 3,
-    @product_id = 1772924;
+    @product_id = 65778;
 go
 
 -- Добавить \ Удалить товар в корзину
 exec dbo.proc_add_to_basket
     @user_id = 3,
-    @product_id = 1745499,
-    @quantity = 1;
+    @product_id = 65778,
+    @quantity = 5;
 go
 
 exec dbo.proc_get_basket
@@ -165,7 +160,7 @@ go
 
 exec dbo.proc_remove_from_basket
     @user_id = 3,
-    @product_id = 1772924;
+    @product_id = 65778;
 go
 
 -- Оформление заказа
@@ -179,18 +174,18 @@ exec dbo.proc_get_user_orders
     @user_id = 3;
 go
 
+-- Просмотреть состав заказа
+exec proc_get_order_items
+    @order_id = 1,
+    @user_id = 3;
+go
+
 -------------------
 --4. АДМИНИСТРАТОР
 -------------------
--- Авторизация
-exec dbo.proc_login_user
-    @login = 'admin',
-    @password = 'AdminStrongPass123!';
-go
-
 -- Добавление нового товара
-exec dbo.proc_add_product
-    @category_id = 1,
+exec proc_add_product
+    @category_id = 4,
     @name = 'тестовый товар',
     @brand = 'brend',
     @price = 55555.55,
@@ -205,7 +200,7 @@ go
 
 -- Обновление товара
 exec dbo.proc_update_product
-    @product_id = 1800001,
+    @product_id = 240001,
     @category_id = 1,
     @name = 'обновлённый тестовый товар',
     @brand = 'brend',
@@ -221,7 +216,7 @@ go
 
 -- Удаление товара
 exec dbo.proc_delete_product
-    @product_id = 1800001;
+    @product_id = 240001;
 go
 
 -- Поиск товара
@@ -231,6 +226,11 @@ go
 
 -- Просмотр заказов и обновление статуса
 exec dbo.proc_get_all_orders;
+go
+
+exec proc_get_order_items
+    @order_id = 1,
+    @user_id = 3;
 go
 
 exec dbo.proc_update_order_status
@@ -248,8 +248,8 @@ exec dbo.proc_get_categories;
 go
 
 exec dbo.proc_update_category
-    @category_id = 6,
-    @category_name = 'ноутбуки новые',
+    @category_id = 4,
+    @category_name = 'пылесосы 1',
     @description = 'обновлено';
 go
 
