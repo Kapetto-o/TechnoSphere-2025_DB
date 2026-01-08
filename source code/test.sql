@@ -1,180 +1,269 @@
 use TechnoSphere_2025_DB;
 go
 
-set nocount on;
-
-begin try
-    select
-        u.user_id,
-        u.login,
-        r.role_name
-    from dbo.users u
-    join dbo.roles r
-        on r.role_id = u.role_id;
-end try
-begin catch
-    print 'ошибка при выводе ролей: ' + error_message();
-end catch
+--------------------------------------------
+--1. РЕЗЕРВНОЕ КОПИРОВАНИЕ И ВОССТАНОВЛЕНИЕ
+--------------------------------------------
+-- Резервное копирование
+alter database TechnoSphere_2025_DB
+set recovery full;
 go
 
-begin try
-    -- добавление
-    declare @category_id int = 1;
-    exec dbo.proc_add_product
-        @category_id = @category_id,
-        @name = 'машина',
-        @brand = 'testbrand',
-        @price = 9999.99,
-        @description = 'добавлен для демонстрации',
-        @is_available = 1;
-
-    -- получаем id добавленного товара
-    declare @test_product_id bigint;
-    set @test_product_id = (select top 1 product_id
-                            from dbo.products
-                            where name = 'тестовый товар'
-                            order by product_id desc);
-
-    -- обновление
-    exec dbo.proc_update_product
-        @product_id = @test_product_id,
-        @category_id = @category_id,
-        @name = 'тестовый товар (обновлён)',
-        @brand = 'testbrand',
-        @price = 10999.99,
-        @description = 'обновлённое описание',
-        @is_available = 1;
-
-    -- удаление
-    exec dbo.proc_delete_product
-        @product_id = @test_product_id;
-end try
-begin catch
-    print 'ошибка управления товарами: ' + error_message();
-end catch
+backup database TechnoSphere_2025_DB
+to disk = 'C:\DataBase\TechnoSphere_2025_DB\technosphere_full.bak'
+with
+    init,
+    name = 'TechnoSphere full backup',
+    stats = 10;
 go
 
--- избранное
-declare @user_id int;
-declare @product_id bigint;
-
-begin try
-    set @user_id = (select top 1 user_id from dbo.users);
-    set @product_id = (select top 1 product_id from dbo.products);
-
-    -- добавление
-    exec dbo.proc_add_to_favorites
-        @user_id = @user_id,
-        @product_id = @product_id;
-
-    select *
-    from dbo.favorites
-    where user_id = @user_id;
-
-    -- удаление
-    exec dbo.proc_remove_from_favorites
-        @user_id = @user_id,
-        @product_id = @product_id;
-end try
-begin catch
-    print 'ошибка работы с избранным: ' + error_message();
-end catch
+backup database TechnoSphere_2025_DB
+to disk = 'C:\DataBase\TechnoSphere_2025_DB\technosphere_diff.bak'
+with
+    differential,
+    init,
+    name = 'TechnoSphere differential backup',
+    stats = 10;
 go
 
--- корзина
-begin try
-    -- добавление в корзину
-    declare @product_id int = 120001;
-    declare @user_id int = 1;
-    exec dbo.proc_add_to_basket
-        @user_id = @user_id,
-        @product_id = @product_id,
-        @quantity = 2;
-
-    -- просмотр корзины
-    exec dbo.proc_get_basket
-        @user_id = @user_id;
-
-    -- удаление из корзины
-    exec dbo.proc_remove_from_basket
-        @user_id = @user_id,
-        @product_id = @product_id;
-end try
-begin catch
-    print 'ошибка работы с корзиной: ' + error_message();
-end catch
+-- Восстановление
+use master;
 go
 
--------------------------------------------------
--- 5. заказы
--------------------------------------------------
-print '5. заказы';
-
-declare @order_id bigint;
-
-begin try
-    -- снова добавляем товар в корзину для создания заказа
-    exec dbo.proc_add_to_basket @user_id, @product_id, 1;
-
-    -- создание заказа
-    exec dbo.proc_create_order
-        @user_id = @user_id,
-        @shipping_address = 'г. тестовый, ул. демонстрационная, д. 1';
-
-    -- получаем id последнего заказа
-    set @order_id = (select top 1 order_id
-                     from dbo.orders
-                     where user_id = @user_id
-                     order by created_at desc);
-
-    -- просмотр заказов пользователя
-    exec dbo.proc_get_user_orders
-        @user_id = @user_id;
-
-    -- изменение статуса заказа
-    exec dbo.proc_update_order_status
-        @order_id = @order_id,
-        @status_id = 2; -- paid
-end try
-begin catch
-    print 'ошибка работы с заказами: ' + error_message();
-end catch
+alter database TechnoSphere_2025_DB
+set single_user
+with rollback immediate;
 go
 
--- фильтрация товаров
-begin try
-    exec dbo.proc_get_products
-        @category_id = @category_id;
-
-    exec dbo.proc_get_products
-        @min_price = 45000,
-        @max_price = 50000;
-
-    exec dbo.proc_get_products
-        @brand = 'samsung';
-end try
-begin catch
-    print 'ошибка фильтрации товаров: ' + error_message();
-end catch
+restore database TechnoSphere_2025_DB
+from disk = 'C:\DataBase\TechnoSphere_2025_DB\technosphere_full.bak'
+with
+    replace,
+    norecovery;
 go
 
--- сортировка товаров
-begin try
-    exec dbo.proc_get_products @sort_mode = 'price';
-    exec dbo.proc_get_products @sort_mode = 'popularity';
-    exec dbo.proc_get_products @sort_mode = 'new';
-end try
-begin catch
-    print 'ошибка сортировки товаров: ' + error_message();
-end catch
+restore database TechnoSphere_2025_DB
+from disk = 'C:\DataBase\TechnoSphere_2025_DB\technosphere_diff.bak'
+with
+    recovery;
 go
 
--- поиск товаров
-begin try
-    exec dbo.proc_search_products
-        @search_text = 'машина';
-end try
-begin catch
-    print 'ошибка поиска товаров: ' + error_message();
-end catch
+alter database TechnoSphere_2025_DB
+set multi_user;
+go
+
+use TechnoSphere_2025_DB;
+go
+---------------------------
+--2. ЭКСПОРТ И ИМПОРТ JSON
+---------------------------
+-- Экспорт
+exec dbo.proc_export_table_to_json
+    @table_name = 'products';
+go
+
+-- Удаление товаров
+delete from products;
+go
+
+select count(*) as products_after_delete from products;
+go
+
+-- Импорт
+exec dbo.proc_import_products_from_json
+    @file_path = 'C:\DataBase\TechnoSphere_2025_DB\products.json';
+go
+
+select count(*) as products_after_import from products;
+go
+
+------------------
+--3. ПОЛЬЗОВАТЕЛЬ
+------------------
+-- Регистрация
+exec dbo.proc_register_user
+    @login = 'test_user',
+    @email = 'test_user@mail.com',
+    @password = 'User123!';
+go
+
+-- Авторизация
+exec dbo.proc_login_user
+    @login = 'test_user',
+    @password = 'User123!';
+go
+
+-- Просмотр всего каталога
+exec dbo.proc_get_products;
+go
+
+-- Просмотр категорий
+exec dbo.proc_get_categories;
+
+-- Фильтрация
+exec dbo.proc_get_products
+    @category_id = 1;
+go
+
+exec dbo.proc_get_products
+    @brand = 'lg';
+go
+
+exec dbo.proc_get_products
+    @min_price = 20000,
+    @max_price = 60000;
+go
+
+-- Сортировка
+exec dbo.proc_get_products
+    @sort_mode = 'price';
+go
+
+exec dbo.proc_get_products
+    @sort_mode = 'popularity';
+go
+
+exec dbo.proc_get_products
+    @sort_mode = 'new';
+go
+
+-- Поиск товаров
+exec dbo.proc_search_products
+    @search_text = 'смартфон samsung galaxy s22 108040';
+go
+
+-- Выбор определённого товара
+exec dbo.proc_get_product_by_id
+    @product_id = 1680096;
+go
+
+-- Добавить \ Удалить товар в избранное
+exec dbo.proc_add_to_favorites
+    @user_id = 3,
+    @product_id = 1745499;
+go
+
+exec dbo.proc_get_favorites
+    @user_id = 3;
+go
+
+exec dbo.proc_remove_from_favorites
+    @user_id = 3,
+    @product_id = 1772924;
+go
+
+-- Добавить \ Удалить товар в корзину
+exec dbo.proc_add_to_basket
+    @user_id = 3,
+    @product_id = 1745499,
+    @quantity = 1;
+go
+
+exec dbo.proc_get_basket
+    @user_id = 3;
+go
+
+exec dbo.proc_remove_from_basket
+    @user_id = 3,
+    @product_id = 1772924;
+go
+
+-- Оформление заказа
+exec dbo.proc_create_order
+    @user_id = 3,
+    @shipping_address = 'г. Минск, ул. Панченко, д. 1';
+go
+
+-- Просмотреть все заказы пользователя
+exec dbo.proc_get_user_orders
+    @user_id = 3;
+go
+
+-------------------
+--4. АДМИНИСТРАТОР
+-------------------
+-- Авторизация
+exec dbo.proc_login_user
+    @login = 'admin',
+    @password = 'AdminStrongPass123!';
+go
+
+-- Добавление нового товара
+exec dbo.proc_add_product
+    @category_id = 1,
+    @name = 'тестовый товар',
+    @brand = 'brend',
+    @price = 55555.55,
+    @description = 'добавлен сегодня',
+    @is_available = 1;
+go
+
+-- Поиск товара
+exec dbo.proc_search_products
+    @search_text = 'тестовый товар';
+go
+
+-- Обновление товара
+exec dbo.proc_update_product
+    @product_id = 1800001,
+    @category_id = 1,
+    @name = 'обновлённый тестовый товар',
+    @brand = 'brend',
+    @price = 60000,
+    @description = 'обновление',
+    @is_available = 1;
+go
+
+-- Поиск товара
+exec dbo.proc_search_products
+    @search_text = 'обновлённый тестовый товар';
+go
+
+-- Удаление товара
+exec dbo.proc_delete_product
+    @product_id = 1800001;
+go
+
+-- Поиск товара
+exec dbo.proc_search_products
+    @search_text = 'обновлённый тестовый товар';
+go
+
+-- Просмотр заказов и обновление статуса
+exec dbo.proc_get_all_orders;
+go
+
+exec dbo.proc_update_order_status
+    @order_id = 1,
+    @status_id = 2;
+go
+
+-- Добавление \ Удаление категорий
+exec dbo.proc_add_category
+    @category_name = 'ноутбуки',
+    @description = 'портативные компьютеры';
+go
+
+exec dbo.proc_get_categories;
+go
+
+exec dbo.proc_update_category
+    @category_id = 6,
+    @category_name = 'ноутбуки новые',
+    @description = 'обновлено';
+go
+
+-- Блокировка \ Разблокировка \ Удаление пользователя
+exec dbo.proc_get_all_users;
+
+exec dbo.proc_block_user
+    @user_id = 3;
+go
+
+exec dbo.proc_unblock_user
+    @user_id = 3;
+go
+
+exec dbo.proc_delete_user
+    @user_id = 3;
 go

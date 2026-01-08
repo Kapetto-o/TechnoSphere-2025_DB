@@ -3,7 +3,9 @@ go
 
 set nocount on;
 
--- 1. категории (без жёстких id)
+-------------------------------------------------
+-- 1. КАТЕГОРИИ
+-------------------------------------------------
 if not exists (select 1 from dbo.categories where category_name = 'стиральные машинки')
     insert into dbo.categories (category_name, description)
     values ('стиральные машинки', 'стиральные/встраиваемые/автоматические модели');
@@ -24,7 +26,9 @@ if not exists (select 1 from dbo.categories where category_name = 'смартфоны')
     insert into dbo.categories (category_name, description)
     values ('смартфоны', 'мобильные устройства разных ценовых категорий');
 
--- 2. временные таблицы брендов и моделей
+-------------------------------------------------
+-- 2. ВРЕМЕННЫЕ ТАБЛИЦЫ
+-------------------------------------------------
 if object_id('tempdb..#brands') is not null drop table #brands;
 create table #brands (
     category_name nvarchar(150),
@@ -72,12 +76,22 @@ insert into #models values
 ('смартфоны', 'galaxy s22'), ('смартфоны', 'iphone 14'),
 ('смартфоны', 'redmi note 12'), ('смартфоны', 'oneplus 10t');
 
-
--- 3. генерация 120 000 товаров
+-------------------------------------------------
+-- 3. ГЕНЕРАЦИЯ 120 000 ТОВАРОВ (ИСПРАВЛЕНО)
+-------------------------------------------------
 ;with nums as (
     select 1 as n
     union all
-    select n + 1 from nums where n < 120000
+    select n + 1
+    from nums
+    where n < 120000
+),
+cat as (
+    select
+        category_id,
+        category_name,
+        row_number() over (order by category_id) as rn
+    from dbo.categories
 )
 insert into dbo.products (
     category_id,
@@ -91,42 +105,59 @@ insert into dbo.products (
 select
     c.category_id,
     concat(
-        case b.category_name
+        case c.category_name
             when 'стиральные машинки' then 'стиральная машина '
             when 'холодильники' then 'холодильник '
             when 'телевизоры' then 'телевизор '
             when 'пылесосы' then 'пылесос '
             when 'смартфоны' then 'смартфон '
         end,
-        b.brand, ' ', m.model, ' ', n
+        b.brand, ' ', m.model, ' ', nums.n
     ),
     b.brand,
     cast(
-        case b.category_name
-            when 'стиральные машинки' then 30000 + abs(checksum(newid())) % 70000
-            when 'холодильники' then 40000 + abs(checksum(newid())) % 160000
-            when 'телевизоры' then 15000 + abs(checksum(newid())) % 60000
-            when 'пылесосы' then 2000  + abs(checksum(newid())) % 80000
-            when 'смартфоны' then 10000 + abs(checksum(newid())) % 90000
+        case c.category_name
+            when 'стиральные машинки' then 30000 + abs(checksum(nums.n)) % 70000
+            when 'холодильники' then 40000 + abs(checksum(nums.n)) % 160000
+            when 'телевизоры' then 15000 + abs(checksum(nums.n)) % 60000
+            when 'пылесосы' then 2000  + abs(checksum(nums.n)) % 80000
+            when 'смартфоны' then 10000 + abs(checksum(nums.n)) % 90000
         end
     as decimal(12,2)),
     concat(
         'модель ', m.model,
         ' от производителя ', b.brand,
-        '. автоматически сгенерирован товар №', n,
+        '. автоматически сгенерирован товар №', nums.n,
         ' для нагрузочного тестирования.'
     ),
-    case when abs(checksum(newid())) % 10 = 0 then 0 else 1 end,
-    dateadd(day, - (abs(checksum(newid())) % 730), sysdatetime())
+    case when nums.n % 10 = 0 then 0 else 1 end,
+    dateadd(day, - (nums.n % 730), sysdatetime())
 from nums
-cross apply (select top 1 * from #brands order by newid()) b
-cross apply (select top 1 * from #models where category_name = b.category_name order by newid()) m
-join dbo.categories c
-    on c.category_name = b.category_name
+join cat c
+    on c.rn = ((nums.n - 1) % 5) + 1
+cross apply (
+    select top 1 *
+    from #brands b2
+    where b2.category_name = c.category_name
+    order by checksum(nums.n)
+) b
+cross apply (
+    select top 1 *
+    from #models m2
+    where m2.category_name = c.category_name
+    order by checksum(nums.n, b.brand)
+) m
 option (maxrecursion 0);
 go
 
--- 4. проверка
-select count(*) as total_products
-from dbo.products;
+-------------------------------------------------
+-- 4. ПРОВЕРКА
+-------------------------------------------------
+select
+    c.category_name,
+    count(*) as product_count
+from dbo.products p
+join dbo.categories c on c.category_id = p.category_id
+group by c.category_name
+order by product_count desc;
 go

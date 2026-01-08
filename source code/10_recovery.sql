@@ -44,7 +44,3 @@ from disk = 'C:\DataBase\TechnoSphere_2025_DB\technosphere_diff.bak'
 with
     recovery;
 go
-
-alter database TechnoSphere_2025_DB
-set multi_user;
-go
